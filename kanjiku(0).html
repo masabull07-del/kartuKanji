@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flashcard Belajar</title>
+<style>
+  :root { color-scheme: dark; --bg:#000; --panel:#1b1b1b; --line:#eee; --muted:#9b9b9b; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:#f7f7f7; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  header { text-align:center; padding:24px 12px 20px; border-bottom:3px solid var(--line); }
+  header h1 { margin:0; font-size:clamp(24px,5vw,36px); line-height:1.25; font-weight:800; }
+  main { max-width:760px; margin:0 auto; padding:0 18px 110px; }
+  .progress { color:#aaa; text-align:center; font-size:23px; margin:2px 0 34px; }
+  .flashcard { min-height:min(55vh,425px); border:0; border-radius:24px; background:transparent; padding:0; text-align:center; cursor:pointer; user-select:none; perspective:1200px; }
+  .card-inner { position:relative; width:100%; min-height:min(55vh,425px); transform-style:preserve-3d; transition:transform .6s cubic-bezier(.2,.7,.2,1); }
+  .flashcard.flipped .card-inner { transform:rotateY(180deg); }
+  .card-face { position:absolute; inset:0; min-height:min(55vh,425px); border:2px solid var(--line); border-radius:24px; background:var(--panel); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center; backface-visibility:hidden; -webkit-backface-visibility:hidden; overflow-wrap:anywhere; }
+  .card-back { transform:rotateY(180deg); }
+  .word { font-size:clamp(38px,8vw,54px); font-weight:800; }
+  .meaning { margin-top:16px; font-size:clamp(21px,5vw,28px); color:#cfcfcf; }
+  .reading { font-size:clamp(26px,6vw,34px); font-weight:750; color:#f5f5f5; }
+  .actions { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin:28px 0 22px; }
+  button { font:inherit; cursor:pointer; border:0; border-radius:14px; padding:18px 22px; color:white; font-weight:750; font-size:clamp(16px,3.8vw,23px); }
+  button:focus-visible, .stat:focus-visible, .nav-item:focus-visible { outline:3px solid white; outline-offset:3px; }
+  .red { background:#762c2f; } .yellow { background:#70672a; } .green { background:#246d3c; }
+  .panel { border:3px solid var(--line); border-radius:24px; background:var(--panel); padding:30px 32px 36px; margin-top:34px; }
+  .panel h2 { text-align:center; font-size:clamp(25px,5vw,32px); margin:0 0 30px; }
+  .stat { border:1px solid #4a4a4a; border-radius:14px; padding:24px; margin:16px 0; cursor:pointer; }
+  .stat .label { font-size:clamp(19px,4vw,27px); display:flex; align-items:center; gap:10px; }
+  .stat .count { font-size:38px; font-weight:800; margin-top:4px; }
+  .stat.green-bg { background:#1d3023; } .stat.yellow-bg { background:#302e1d; } .stat.red-bg { background:#301e1f; }
+  .subtext { text-align:center; color:#888; font-size:21px; margin:34px 0 4px; }
+  nav { position:fixed; bottom:0; left:0; right:0; display:flex; justify-content:space-around; background:#111; border-top:3px solid #eee; padding:14px 10px 12px; z-index:5; }
+  .nav-item { width:50%; text-align:center; cursor:pointer; color:#bbb; font-weight:750; font-size:18px; padding:8px; }
+  .nav-item.active { color:white; }
+  .nav-item .emoji { display:block; font-size:32px; margin-bottom:2px; }
+  .hidden { display:none !important; }
+  .toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:20px 0; }
+  .small-btn { font-size:16px; padding:10px 14px; background:#333; }
+  .header-actions { max-width:760px; margin:0 auto; padding:12px 18px 0; display:flex; justify-content:space-between; gap:12px; }
+  .header-actions .small-btn { background:#292929; }
+  .reading { margin-top:4px; font-size:clamp(26px,6vw,34px); font-weight:750; color:#f5f5f5; }
+  .meaning { margin-top:16px; font-size:clamp(21px,5vw,28px); color:#cfcfcf; }
+  .extra-toolbar { justify-content:center; margin-top:8px; }
+  .extra-toolbar .small-btn { background:#242424; color:#ddd; }
+  .empty { color:#aaa; text-align:center; padding:28px 0; font-size:18px; }
+  @media (max-width:480px) {
+    header { padding:22px 8px 18px; }
+    header h1 { font-size:27px; }
+    main { padding:0 18px 100px; }
+    .progress { font-size:19px; margin:2px 0 24px; }
+    .flashcard { min-height: min(48vh, 380px); border-radius:22px; }
+    .actions { gap:8px; margin:26px 0 20px; }
+    button { padding:13px 14px; font-size:16px; border-radius:12px; }
+    .toolbar { margin:14px 0; }
+    .small-btn { font-size:13px; padding:10px 9px; }
+    .toolbar { gap:7px; }
+    .extra-toolbar .small-btn { font-size:14px; padding:10px 14px; }
+    .panel { margin-top:24px; padding:24px 18px 28px; border-width:2px; }
+    .panel h2 { margin-bottom:22px; }
+    .stat { padding:17px; margin:12px 0; }
+    .stat .count { font-size:32px; }
+    .subtext { font-size:16px; margin-top:26px; }
+    nav { padding:10px 8px 8px; }
+    .nav-item { font-size:16px; padding:6px; }
+    .nav-item .emoji { font-size:27px; }
+  }
+
+/* Perbaikan: hilangkan sorotan biru saat kartu diketuk/dibalik */
+* { -webkit-tap-highlight-color: transparent !important; }
+.flashcard, .flashcard * , .card, .card-front, .card-back {
+  -webkit-tap-highlight-color: transparent !important;
+  outline-color: transparent;
+}
+
+</style>
+</head>
+<body>
+<header><h1>📚 Flashcard Belajar</h1></header>
+<div class="header-actions"><button class="small-btn" id="topShuffleBtn">🔀 Acak</button><button class="small-btn" id="topResetBtn">↻ Ulangi</button></div>
+<main>
+  <section id="learnView">
+    <div class="progress" id="progress">1 / 5</div>
+    <div class="flashcard" id="flashcard" role="button" tabindex="0" aria-label="Ketuk untuk membalik kartu">
+      <div class="card-inner">
+        <div class="card-face card-front"><div class="word" id="word">今日</div></div>
+        <div class="card-face card-back">
+          <div class="reading" id="reading">きょう (kyō)</div>
+          <div class="meaning" id="meaning">Hari ini</div>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="red" data-status="unlearned">❌ Belum Hafal</button>
+      <button class="yellow" data-status="unsure">⚠️ Ragu-ragu</button>
+      <button class="green" data-status="learned">✅ Sudah Hafal</button>
+    </div>
+    <p id="statusFeedback" class="subtext" aria-live="polite" style="margin:12px 0; min-height:24px;"></p>
+    <div class="toolbar">
+      <button class="small-btn" id="prevBtn">← Sebelumnya</button>
+      <button class="small-btn" id="nextBtn">Berikutnya →</button>
+    </div>
+  </section>
+
+  <section id="summaryView" class="hidden">
+    <div class="panel">
+      <h2>📊 Ringkasan Hafalan</h2>
+      <div class="stat green-bg" role="button" tabindex="0" data-filter="learned">
+        <div class="label">✅ Sudah Hafal</div><div class="count" id="learnedCount">0</div>
+      </div>
+      <div class="stat yellow-bg" role="button" tabindex="0" data-filter="unsure">
+        <div class="label">⚠️ Ragu-ragu</div><div class="count" id="unsureCount">0</div>
+      </div>
+      <div class="stat red-bg" role="button" tabindex="0" data-filter="unlearned">
+        <div class="label">❌ Belum Hafal</div><div class="count" id="unlearnedCount">0</div>
+      </div>
+      <p class="subtext">Klik kategori di atas untuk mulai mengulang</p>
+    </div>
+  </section>
+</main>
+<nav>
+  <div class="nav-item active" id="learnTab"><span class="emoji">📖</span>Belajar</div>
+  <div class="nav-item" id="summaryTab"><span class="emoji">📋</span>Ringkasan</div>
+</nav>
+<script>
+  // Ubah atau tambahkan kosakata di daftar ini.
+  const cards = [
+    { word: "今日", meaning: "Hari ini", reading: "きょう" },
+    { word: "明日", meaning: "Besok", reading: "あした" },
+    { word: "昨日", meaning: "Kemarin", reading: "きのう" },
+    { word: "学校", meaning: "Sekolah", reading: "がっこう" },
+    { word: "友達", meaning: "Teman", reading: "ともだち" },
+  { word: "場合", meaning: "Keadaan, kasus", reading: "ばあい" },
+  { word: "理由", meaning: "Alasan", reading: "りゆう" },
+  { word: "途中", meaning: "Di tengah perjalanan", reading: "とちゅう" },
+  { word: "予定", meaning: "Rencana, jadwal", reading: "よてい" },
+  { word: "準備", meaning: "Persiapan", reading: "じゅんび" },
+  { word: "必要", meaning: "Perlu, diperlukan", reading: "ひつよう" },
+  { word: "十分", meaning: "Cukup", reading: "じゅうぶん" },
+  { word: "特別", meaning: "Khusus, istimewa", reading: "とくべつ" },
+  { word: "普通", meaning: "Biasa, normal", reading: "ふつう" },
+  { word: "安全", meaning: "Aman, keselamatan", reading: "あんぜん" },
+  { word: "危険", meaning: "Bahaya", reading: "きけん" },
+  { word: "成功", meaning: "Keberhasilan", reading: "せいこう" },
+  { word: "失敗", meaning: "Kegagalan", reading: "しっぱい" },
+  { word: "経験", meaning: "Pengalaman", reading: "けいけん" },
+  { word: "習慣", meaning: "Kebiasaan", reading: "しゅうかん" },
+  { word: "文化", meaning: "Budaya", reading: "ぶんか" },
+  { word: "社会", meaning: "Masyarakat", reading: "しゃかい" },
+  { word: "世界", meaning: "Dunia", reading: "せかい" },
+  { word: "自然", meaning: "Alam", reading: "しぜん" },
+  { word: "環境", meaning: "Lingkungan", reading: "かんきょう" },
+  { word: "関係", meaning: "Hubungan", reading: "かんけい" },
+  { word: "影響", meaning: "Pengaruh", reading: "えいきょう" },
+  { word: "原因", meaning: "Penyebab", reading: "げんいん" },
+  { word: "結果", meaning: "Hasil, akibat", reading: "けっか" },
+  { word: "方法", meaning: "Cara, metode", reading: "ほうほう" },
+  { word: "意見", meaning: "Pendapat", reading: "いけん" },
+  { word: "説明", meaning: "Penjelasan", reading: "せつめい" },
+  { word: "連絡", meaning: "Menghubungi, kontak", reading: "れんらく" },
+  { word: "相談", meaning: "Konsultasi, berdiskusi", reading: "そうだん" },
+  { word: "約束", meaning: "Janji", reading: "やくそく" },
+  { word: "注意", meaning: "Perhatian, berhati-hati", reading: "ちゅうい" },
+  { word: "確認", meaning: "Memastikan, memeriksa", reading: "かくにん" },
+  { word: "変更", meaning: "Perubahan", reading: "へんこう" },
+  { word: "決定", meaning: "Keputusan, penetapan", reading: "けってい" },
+  { word: "比較", meaning: "Perbandingan", reading: "ひかく" },
+  { word: "利用", meaning: "Penggunaan, memanfaatkan", reading: "りよう" },
+  { word: "参加", meaning: "Berpartisipasi", reading: "さんか" },
+  { word: "招待", meaning: "Undangan, mengundang", reading: "しょうたい" },
+  { word: "紹介", meaning: "Perkenalan", reading: "しょうかい" },
+  { word: "案内", meaning: "Panduan, petunjuk", reading: "あんない" },
+  { word: "運転", meaning: "Mengemudi", reading: "うんてん" },
+  { word: "交通", meaning: "Lalu lintas, transportasi", reading: "こうつう" },
+  { word: "事故", meaning: "Kecelakaan", reading: "じこ" },
+  { word: "遅刻", meaning: "Terlambat", reading: "ちこく" },
+  { word: "欠席", meaning: "Tidak hadir", reading: "けっせき" },
+  { word: "出席", meaning: "Hadir", reading: "しゅっせき" },
+  { word: "到着", meaning: "Tiba", reading: "とうちゃく" },
+  { word: "出発", meaning: "Berangkat", reading: "しゅっぱつ" },
+  { word: "予約", meaning: "Reservasi, pemesanan", reading: "よやく" },
+  { word: "費用", meaning: "Biaya", reading: "ひよう" },
+  { word: "経済", meaning: "Ekonomi", reading: "けいざい" },
+  { word: "政治", meaning: "Politik", reading: "せいじ" },
+  { word: "教育", meaning: "Pendidikan", reading: "きょういく" },
+  { word: "技術", meaning: "Teknologi, teknik", reading: "ぎじゅつ" },
+  { word: "科学", meaning: "Ilmu pengetahuan", reading: "かがく" },
+  { word: "医療", meaning: "Pelayanan medis", reading: "いりょう" },
+  { word: "健康", meaning: "Kesehatan", reading: "けんこう" },
+  { word: "病気", meaning: "Penyakit", reading: "びょうき" },
+  { word: "治療", meaning: "Pengobatan", reading: "ちりょう" },
+  { word: "症状", meaning: "Gejala", reading: "しょうじょう" },
+  { word: "運動", meaning: "Olahraga, gerakan", reading: "うんどう" },
+  { word: "食事", meaning: "Makan", reading: "しょくじ" },
+  { word: "栄養", meaning: "Nutrisi", reading: "えいよう" },
+  { word: "睡眠", meaning: "Tidur", reading: "すいみん" },
+  { word: "生活", meaning: "Kehidupan sehari-hari", reading: "せいかつ" },
+  { word: "仕事", meaning: "Pekerjaan", reading: "しごと" },
+  { word: "職業", meaning: "Profesi", reading: "しょくぎょう" },
+  { word: "給料", meaning: "Gaji", reading: "きゅうりょう" },
+  { word: "収入", meaning: "Penghasilan", reading: "しゅうにゅう" },
+  { word: "支出", meaning: "Pengeluaran", reading: "ししゅつ" },
+  { word: "貯金", meaning: "Tabungan", reading: "ちょきん" },
+  { word: "税金", meaning: "Pajak", reading: "ぜいきん" },
+  { word: "商品", meaning: "Barang dagangan", reading: "しょうひん" },
+  { word: "製品", meaning: "Produk", reading: "せいひん" },
+  { word: "値段", meaning: "Harga", reading: "ねだん" },
+  { word: "価格", meaning: "Harga, nilai", reading: "かかく" },
+  { word: "割引", meaning: "Diskon", reading: "わりびき" },
+  { word: "無料", meaning: "Gratis", reading: "むりょう" },
+  { word: "有料", meaning: "Berbayar", reading: "ゆうりょう" },
+  { word: "注文", meaning: "Pesanan", reading: "ちゅうもん" },
+  { word: "配達", meaning: "Pengantaran", reading: "はいたつ" },
+  { word: "荷物", meaning: "Barang bawaan, paket", reading: "にもつ" },
+  { word: "郵便", meaning: "Pos, surat", reading: "ゆうびん" },
+  { word: "手続き", meaning: "Prosedur, pengurusan", reading: "てつづき" },
+  { word: "書類", meaning: "Dokumen", reading: "しょるい" },
+  { word: "申請", meaning: "Pengajuan, permohonan", reading: "しんせい" },
+  { word: "許可", meaning: "Izin", reading: "きょか" },
+  { word: "禁止", meaning: "Larangan", reading: "きんし" },
+  { word: "規則", meaning: "Peraturan", reading: "きそく" },
+  { word: "法律", meaning: "Hukum, undang-undang", reading: "ほうりつ" },
+  { word: "責任", meaning: "Tanggung jawab", reading: "せきにん" },
+  { word: "義務", meaning: "Kewajiban", reading: "ぎむ" },
+  { word: "権利", meaning: "Hak", reading: "けんり" },
+  { word: "自由", meaning: "Kebebasan", reading: "じゆう" },
+  { word: "平和", meaning: "Perdamaian", reading: "へいわ" },
+  { word: "戦争", meaning: "Perang", reading: "せんそう" },
+  { word: "政府", meaning: "Pemerintah", reading: "せいふ" },
+  { word: "国民", meaning: "Rakyat, warga negara", reading: "こくみん" },
+  { word: "地域", meaning: "Wilayah, daerah", reading: "ちいき" },
+  { word: "都会", meaning: "Kota besar", reading: "とかい" },
+    
+  { word: "田舎", meaning: "Desa, daerah pedesaan", reading: "いなか" },
+  { word: "景色", meaning: "Pemandangan", reading: "けしき" },
+  { word: "風景", meaning: "Lanskap, pemandangan", reading: "ふうけい" },
+  { word: "気温", meaning: "Suhu udara", reading: "きおん" },
+  { word: "温度", meaning: "Suhu, temperatur", reading: "おんど" },
+  { word: "湿度", meaning: "Kelembapan", reading: "しつど" },
+  { word: "季節", meaning: "Musim", reading: "きせつ" },
+  { word: "天候", meaning: "Kondisi cuaca", reading: "てんこう" },
+  { word: "台風", meaning: "Topan", reading: "たいふう" },
+  { word: "地震", meaning: "Gempa bumi", reading: "じしん" },
+  { word: "火事", meaning: "Kebakaran", reading: "かじ" },
+  { word: "災害", meaning: "Bencana", reading: "さいがい" },
+  { word: "被害", meaning: "Kerusakan akibat bencana", reading: "ひがい" },
+  { word: "避難", meaning: "Evakuasi, mengungsi", reading: "ひなん" },
+  { word: "建物", meaning: "Bangunan", reading: "たてもの" },
+  { word: "建築", meaning: "Arsitektur, pembangunan gedung", reading: "けんちく" },
+  { word: "工事", meaning: "Pekerjaan konstruksi", reading: "こうじ" },
+  { word: "設備", meaning: "Fasilitas, perlengkapan", reading: "せつび" },
+  { word: "施設", meaning: "Fasilitas, institusi", reading: "しせつ" },
+  { word: "故障", meaning: "Kerusakan mesin atau alat", reading: "こしょう" },
+  { word: "修理", meaning: "Perbaikan", reading: "しゅうり" },
+  { word: "部品", meaning: "Suku cadang, komponen", reading: "ぶひん" },
+  { word: "機械", meaning: "Mesin", reading: "きかい" },
+  { word: "道具", meaning: "Alat, perkakas", reading: "どうぐ" },
+  { word: "材料", meaning: "Bahan", reading: "ざいりょう" },
+  { word: "原料", meaning: "Bahan baku", reading: "げんりょう" },
+  { word: "資源", meaning: "Sumber daya", reading: "しげん" },
+  { word: "電気", meaning: "Listrik", reading: "でんき" },
+  { word: "電池", meaning: "Baterai", reading: "でんち" },
+  { word: "電源", meaning: "Sumber daya listrik", reading: "でんげん" },
+  { word: "通信", meaning: "Komunikasi", reading: "つうしん" },
+  { word: "情報", meaning: "Informasi", reading: "じょうほう" },
+  { word: "記事", meaning: "Artikel, berita", reading: "きじ" },
+  { word: "新聞", meaning: "Surat kabar", reading: "しんぶん" },
+  { word: "報告", meaning: "Laporan, melaporkan", reading: "ほうこく" },
+  { word: "連続", meaning: "Berurutan, berkelanjutan", reading: "れんぞく" },
+  { word: "番組", meaning: "Acara televisi atau radio", reading: "ばんぐみ" },
+  { word: "放送", meaning: "Siaran", reading: "ほうそう" },
+  { word: "広告", meaning: "Iklan", reading: "こうこく" },
+  { word: "宣伝", meaning: "Promosi", reading: "せんでん" },
+  { word: "印刷", meaning: "Percetakan, mencetak", reading: "いんさつ" },
+  { word: "出版", meaning: "Penerbitan", reading: "しゅっぱん" },
+  { word: "作者", meaning: "Penulis, pencipta", reading: "さくしゃ" },
+  { word: "作品", meaning: "Karya", reading: "さくひん" },
+  { word: "小説", meaning: "Novel", reading: "しょうせつ" },
+  { word: "文学", meaning: "Sastra", reading: "ぶんがく" },
+  { word: "芸術", meaning: "Seni", reading: "げいじゅつ" },
+  { word: "音楽", meaning: "Musik", reading: "おんがく" },
+  { word: "演奏", meaning: "Pertunjukan musik", reading: "えんそう" },
+  { word: "展覧会", meaning: "Pameran", reading: "てんらんかい" },
+
+  { word: "趣味", meaning: "Hobi", reading: "しゅみ" },
+  { word: "興味", meaning: "Ketertarikan, minat", reading: "きょうみ" },
+  { word: "関心", meaning: "Perhatian, kepedulian", reading: "かんしん" },
+  { word: "感動", meaning: "Terharu, tersentuh", reading: "かんどう" },
+  { word: "感情", meaning: "Perasaan, emosi", reading: "かんじょう" },
+  { word: "気分", meaning: "Suasana hati, kondisi tubuh", reading: "きぶん" },
+  { word: "印象", meaning: "Kesan", reading: "いんしょう" },
+  { word: "性格", meaning: "Kepribadian", reading: "せいかく" },
+  { word: "態度", meaning: "Sikap", reading: "たいど" },
+  { word: "表情", meaning: "Ekspresi wajah", reading: "ひょうじょう" },
+  { word: "笑顔", meaning: "Senyuman", reading: "えがお" },
+  { word: "涙", meaning: "Air mata", reading: "なみだ" },
+  { word: "怒る", meaning: "Marah", reading: "おこる" },
+  { word: "喜ぶ", meaning: "Bergembira", reading: "よろこぶ" },
+  { word: "悲しむ", meaning: "Bersedih", reading: "かなしむ" },
+  { word: "驚く", meaning: "Terkejut", reading: "おどろく" },
+  { word: "心配", meaning: "Khawatir", reading: "しんぱい" },
+  { word: "安心", meaning: "Lega, tenang", reading: "あんしん" },
+  { word: "緊張", meaning: "Gugup, tegang", reading: "きんちょう" },
+  { word: "興奮", meaning: "Bersemangat, berdebar", reading: "こうふん" },
+  { word: "我慢", meaning: "Menahan diri, bersabar", reading: "がまん" },
+  { word: "努力", meaning: "Usaha keras", reading: "どりょく" },
+  { word: "成長", meaning: "Pertumbuhan, berkembang", reading: "せいちょう" },
+  { word: "発達", meaning: "Perkembangan", reading: "はったつ" },
+  { word: "進歩", meaning: "Kemajuan", reading: "しんぽ" },
+  { word: "発展", meaning: "Perkembangan, kemajuan", reading: "はってん" },
+  { word: "変化", meaning: "Perubahan", reading: "へんか" },
+  { word: "増加", meaning: "Peningkatan, bertambah", reading: "ぞうか" },
+  { word: "減少", meaning: "Penurunan, berkurang", reading: "げんしょう" },
+  { word: "上昇", meaning: "Kenaikan", reading: "じょうしょう" },
+  { word: "低下", meaning: "Penurunan", reading: "ていか" },
+  { word: "改善", meaning: "Perbaikan", reading: "かいぜん" },
+  { word: "解決", meaning: "Penyelesaian masalah", reading: "かいけつ" },
+  { word: "工夫", meaning: "Akal atau cara kreatif", reading: "くふう" },
+  { word: "発見", meaning: "Penemuan", reading: "はっけん" },
+  { word: "発明", meaning: "Penemuan atau ciptaan baru", reading: "はつめい" },
+  { word: "研究", meaning: "Penelitian", reading: "けんきゅう" },
+  { word: "調査", meaning: "Penyelidikan, survei", reading: "ちょうさ" },
+  { word: "実験", meaning: "Eksperimen", reading: "じっけん" },
+  { word: "観察", meaning: "Pengamatan", reading: "かんさつ" },
+  { word: "分析", meaning: "Analisis", reading: "ぶんせき" },
+  { word: "判断", meaning: "Penilaian, keputusan", reading: "はんだん" },
+  { word: "予想", meaning: "Perkiraan", reading: "よそう" },
+  { word: "想像", meaning: "Imajinasi, membayangkan", reading: "そうぞう" },
+  { word: "記憶", meaning: "Ingatan", reading: "きおく" },
+  { word: "記録", meaning: "Catatan, rekaman", reading: "きろく" },
+  { word: "集中", meaning: "Konsentrasi", reading: "しゅうちゅう" },
+  { word: "理解", meaning: "Pemahaman, memahami", reading: "りかい" },
+  { word: "納得", meaning: "Menerima setelah memahami", reading: "なっとく" },
+  { word: "解釈", meaning: "Penafsiran, interpretasi", reading: "かいしゃく" },
+
+  { word: "認める", meaning: "Mengakui, menerima", reading: "みとめる" },
+  { word: "断る", meaning: "Menolak", reading: "ことわる" },
+  { word: "許す", meaning: "Memaafkan, mengizinkan", reading: "ゆるす" },
+  { word: "選ぶ", meaning: "Memilih", reading: "えらぶ" },
+  { word: "決める", meaning: "Memutuskan, menentukan", reading: "きめる" },
+  { word: "比べる", meaning: "Membandingkan", reading: "くらべる" },
+  { word: "調べる", meaning: "Memeriksa, mencari tahu", reading: "しらべる" },
+  { word: "確かめる", meaning: "Memastikan", reading: "たしかめる" },
+  { word: "伝える", meaning: "Menyampaikan", reading: "つたえる" },
+  { word: "届ける", meaning: "Mengantarkan, menyampaikan", reading: "とどける" },
+  { word: "受け取る", meaning: "Menerima", reading: "うけとる" },
+  { word: "渡す", meaning: "Menyerahkan", reading: "わたす" },
+  { word: "預ける", meaning: "Menitipkan", reading: "あずける" },
+  { word: "預かる", meaning: "Menerima titipan", reading: "あずかる" },
+  { word: "返す", meaning: "Mengembalikan", reading: "かえす" },
+  { word: "返事", meaning: "Jawaban, balasan", reading: "へんじ" },
+  { word: "答え", meaning: "Jawaban", reading: "こたえ" },
+  { word: "尋ねる", meaning: "Bertanya", reading: "たずねる" },
+  { word: "訪ねる", meaning: "Mengunjungi", reading: "たずねる" },
+  { word: "誘う", meaning: "Mengajak", reading: "さそう" },
+  { word: "迎える", meaning: "Menjemput, menyambut", reading: "むかえる" },
+  { word: "見送る", meaning: "Mengantar kepergian", reading: "みおくる" },
+  { word: "付き合う", meaning: "Bergaul, menjalin hubungan", reading: "つきあう" },
+  { word: "助ける", meaning: "Menolong", reading: "たすける" },
+  { word: "手伝う", meaning: "Membantu", reading: "てつだう" },
+  { word: "支える", meaning: "Menopang, mendukung", reading: "ささえる" },
+  { word: "守る", meaning: "Melindungi, menaati", reading: "まもる" },
+  { word: "防ぐ", meaning: "Mencegah", reading: "ふせぐ" },
+  { word: "避ける", meaning: "Menghindari", reading: "さける" },
+  { word: "逃げる", meaning: "Melarikan diri", reading: "にげる" },
+  { word: "追いかける", meaning: "Mengejar", reading: "おいかける" },
+  { word: "捕まえる", meaning: "Menangkap", reading: "つかまえる" },
+  { word: "拾う", meaning: "Memungut", reading: "ひろう" },
+  { word: "捨てる", meaning: "Membuang", reading: "すてる" },
+  { word: "片付ける", meaning: "Merapikan", reading: "かたづける" },
+  { word: "整理", meaning: "Penataan, pengaturan", reading: "せいり" },
+  { word: "整理する", meaning: "Menata, merapikan", reading: "せいりする" },
+  { word: "交換", meaning: "Pertukaran", reading: "こうかん" },
+  { word: "取り替える", meaning: "Mengganti", reading: "とりかえる" },
+  { word: "壊す", meaning: "Merusak", reading: "こわす" },
+  { word: "壊れる", meaning: "Rusak", reading: "こわれる" },
+  { word: "汚す", meaning: "Mengotori", reading: "よごす" },
+  { word: "汚れる", meaning: "Menjadi kotor", reading: "よごれる" },
+  { word: "濡らす", meaning: "Membasahi", reading: "ぬらす" },
+  { word: "濡れる", meaning: "Menjadi basah", reading: "ぬれる" },
+  { word: "乾かす", meaning: "Mengeringkan", reading: "かわかす" },
+  { word: "乾く", meaning: "Menjadi kering", reading: "かわく" },
+  { word: "冷やす", meaning: "Mendinginkan", reading: "ひやす" },
+  { word: "冷える", meaning: "Menjadi dingin", reading: "ひえる" },
+  { word: "冷ます", meaning: "Mendinginkan sesuatu", reading: "さます" },
+  { word: "冷める", meaning: "Menjadi dingin", reading: "さめる" },
+  { word: "沸かす", meaning: "Mendidihkan air", reading: "わかす" },
+  { word: "沸く", meaning: "Mendidih", reading: "わく" },
+  { word: "焼く", meaning: "Memanggang, membakar", reading: "やく" },
+  { word: "焼ける", meaning: "Terpanggang, terbakar", reading: "やける" },
+  { word: "煮る", meaning: "Merebus, memasak dengan kuah", reading: "にる" },
+  { word: "蒸す", meaning: "Mengukus", reading: "むす" },
+  { word: "混ぜる", meaning: "Mencampur", reading: "まぜる" },
+  { word: "混ざる", meaning: "Bercampur", reading: "まざる" },
+  { word: "包む", meaning: "Membungkus", reading: "つつむ" },
+  { word: "結ぶ", meaning: "Mengikat, menjalin", reading: "むすぶ" },
+  { word: "解く", meaning: "Melepaskan ikatan, memecahkan soal", reading: "とく" },
+  { word: "外す", meaning: "Melepaskan, mencopot", reading: "はずす" },
+  { word: "外れる", meaning: "Terlepas, meleset", reading: "はずれる" },
+  { word: "取り付ける", meaning: "Memasang", reading: "とりつける" },
+  { word: "触る", meaning: "Menyentuh", reading: "さわる" },
+  { word: "押す", meaning: "Mendorong, menekan", reading: "おす" },
+  { word: "引く", meaning: "Menarik", reading: "ひく" },
+  { word: "倒す", meaning: "Menjatuhkan, merobohkan", reading: "たおす" },
+  { word: "倒れる", meaning: "Jatuh, roboh", reading: "たおれる" },
+  { word: "起こす", meaning: "Membangunkan, menyebabkan", reading: "おこす" },
+  { word: "起きる", meaning: "Bangun, terjadi", reading: "おきる" },
+  { word: "揺れる", meaning: "Bergoyang, bergetar", reading: "ゆれる" },
+  { word: "動かす", meaning: "Menggerakkan", reading: "うごかす" },
+  { word: "動く", meaning: "Bergerak", reading: "うごく" },
+  { word: "回す", meaning: "Memutar sesuatu", reading: "まわす" },
+  { word: "回る", meaning: "Berputar", reading: "まわる" },
+  { word: "曲げる", meaning: "Membengkokkan", reading: "まげる" },
+  { word: "曲がる", meaning: "Membengkok, berbelok", reading: "まがる" },
+  { word: "折る", meaning: "Melipat, mematahkan", reading: "おる" },
+  { word: "折れる", meaning: "Terlipat, patah", reading: "おれる" },
+  { word: "破る", meaning: "Merobek, melanggar", reading: "やぶる" },
+  { word: "破れる", meaning: "Robek", reading: "やぶれる" },
+  { word: "切る", meaning: "Memotong", reading: "きる" },
+  { word: "切れる", meaning: "Terputus, menjadi tajam", reading: "きれる" },
+  { word: "刺す", meaning: "Menusuk, menyengat", reading: "さす" },
+  { word: "刺さる", meaning: "Tertusuk", reading: "ささる" },
+  { word: "取れる", meaning: "Terlepas, bisa diambil", reading: "とれる" },
+  { word: "抜く", meaning: "Mencabut, mengeluarkan", reading: "ぬく" },
+  { word: "抜ける", meaning: "Terlepas, tercabut", reading: "ぬける" },
+  { word: "足す", meaning: "Menambahkan", reading: "たす" },
+  { word: "引き算", meaning: "Pengurangan", reading: "ひきざん" },
+  { word: "足し算", meaning: "Penjumlahan", reading: "たしざん" },
+  { word: "掛け算", meaning: "Perkalian", reading: "かけざん" },
+  { word: "割り算", meaning: "Pembagian", reading: "わりざん" },
+  { word: "数える", meaning: "Menghitung", reading: "かぞえる" },
+  { word: "測る", meaning: "Mengukur panjang atau ukuran", reading: "はかる" },
+  { word: "量る", meaning: "Mengukur berat atau volume", reading: "はかる" },
+  { word: "計る", meaning: "Mengukur waktu, memperkirakan", reading: "はかる" },
+
+  { word: "増える", meaning: "Bertambah", reading: "ふえる" },
+  { word: "増やす", meaning: "Menambah", reading: "ふやす" },
+  { word: "減る", meaning: "Berkurang", reading: "へる" },
+  { word: "減らす", meaning: "Mengurangi", reading: "へらす" },
+  { word: "変わる", meaning: "Berubah", reading: "かわる" },
+  { word: "変える", meaning: "Mengubah", reading: "かえる" },
+  { word: "続く", meaning: "Berlanjut", reading: "つづく" },
+  { word: "続ける", meaning: "Melanjutkan", reading: "つづける" },
+  { word: "終わる", meaning: "Selesai, berakhir", reading: "おわる" },
+  { word: "終える", meaning: "Menyelesaikan", reading: "おえる" },
+  { word: "始まる", meaning: "Dimulai", reading: "はじまる" },
+  { word: "始める", meaning: "Memulai", reading: "はじめる" },
+  { word: "間に合う", meaning: "Sempat, tepat waktu", reading: "まにあう" },
+  { word: "遅れる", meaning: "Terlambat", reading: "おくれる" },
+  { word: "急ぐ", meaning: "Bergegas", reading: "いそぐ" },
+  { word: "間違える", meaning: "Melakukan kesalahan", reading: "まちがえる" },
+  { word: "間違う", meaning: "Salah", reading: "まちがう" },
+  { word: "正しい", meaning: "Benar", reading: "ただしい" },
+  { word: "正確", meaning: "Akurat", reading: "せいかく" },
+  { word: "詳しい", meaning: "Terperinci, mengetahui banyak", reading: "くわしい" },
+  { word: "珍しい", meaning: "Langka, tidak biasa", reading: "めずらしい" },
+  { word: "素晴らしい", meaning: "Luar biasa", reading: "すばらしい" },
+  { word: "細かい", meaning: "Kecil, terperinci", reading: "こまかい" },
+  { word: "粗い", meaning: "Kasar, tidak halus", reading: "あらい" },
+  { word: "深い", meaning: "Dalam", reading: "ふかい" },
+  { word: "浅い", meaning: "Dangkal", reading: "あさい" },
+  { word: "固い", meaning: "Keras, kaku", reading: "かたい" },
+  { word: "柔らかい", meaning: "Lembut", reading: "やわらかい" },
+  { word: "厚い", meaning: "Tebal", reading: "あつい" },
+  { word: "薄い", meaning: "Tipis, encer", reading: "うすい" },
+  { word: "濃い", meaning: "Pekat, kental, warnanya kuat", reading: "こい" },
+  { word: "薄暗い", meaning: "Remang-remang", reading: "うすぐらい" },
+  { word: "明るい", meaning: "Terang, ceria", reading: "あかるい" },
+  { word: "暗い", meaning: "Gelap, murung", reading: "くらい" },
+  { word: "騒がしい", meaning: "Berisik", reading: "さわがしい" },
+  { word: "静か", meaning: "Tenang, sepi", reading: "しずか" },
+  { word: "うるさい", meaning: "Berisik, mengganggu", reading: "うるさい" },
+  { word: "まぶしい", meaning: "Menyilaukan", reading: "まぶしい" },
+  { word: "恐ろしい", meaning: "Mengerikan", reading: "おそろしい" },
+  { word: "怖い", meaning: "Takut, menakutkan", reading: "こわい" },
+  { word: "恥ずかしい", meaning: "Malu", reading: "はずかしい" },
+  { word: "情けない", meaning: "Memalukan, menyedihkan", reading: "なさけない" },
+  { word: "うれしい", meaning: "Senang, gembira", reading: "うれしい" },
+  { word: "悲しい", meaning: "Sedih", reading: "かなしい" },
+  { word: "寂しい", meaning: "Kesepian", reading: "さびしい" },
+  { word: "苦しい", meaning: "Menderita, sesak, sulit", reading: "くるしい" },
+  { word: "苦い", meaning: "Pahit", reading: "にがい" },
+  { word: "甘い", meaning: "Manis", reading: "あまい" },
+  { word: "酸っぱい", meaning: "Asam", reading: "すっぱい" },
+  { word: "塩辛い", meaning: "Asin", reading: "しおからい" },
+  { word: "苦手", meaning: "Tidak pandai, kurang suka", reading: "にがて" },
+  { word: "得意", meaning: "Mahir, pandai", reading: "とくい" },
+  { word: "上手", meaning: "Pandai, terampil", reading: "じょうず" },
+  { word: "下手", meaning: "Tidak mahir", reading: "へた" },
+  { word: "厳しい", meaning: "Ketat, keras", reading: "きびしい" },
+  { word: "優しい", meaning: "Baik hati, lembut", reading: "やさしい" },
+  { word: "易しい", meaning: "Mudah", reading: "やさしい" },
+  { word: "難しい", meaning: "Sulit", reading: "むずかしい" },
+  { word: "面倒", meaning: "Merepotkan", reading: "めんどう" },
+  { word: "面倒くさい", meaning: "Malas karena merepotkan", reading: "めんどうくさい" },
+  { word: "退屈", meaning: "Bosan", reading: "たいくつ" },
+  { word: "楽しみ", meaning: "Hal yang dinantikan", reading: "たのしみ" },
+  { word: "幸せ", meaning: "Kebahagiaan, bahagia", reading: "しあわせ" },
+  { word: "不幸", meaning: "Tidak bahagia, kemalangan", reading: "ふこう" },
+  { word: "残念", meaning: "Sayang sekali, mengecewakan", reading: "ざんねん" },
+  { word: "意外", meaning: "Tidak terduga", reading: "いがい" },
+  { word: "当然", meaning: "Wajar, sudah semestinya", reading: "とうぜん" },
+  { word: "急", meaning: "Mendadak, tiba-tiba", reading: "きゅう" },
+  { word: "急に", meaning: "Secara tiba-tiba", reading: "きゅうに" },
+  { word: "特に", meaning: "Terutama, khususnya", reading: "とくに" },
+  { word: "必ず", meaning: "Pasti", reading: "かならず" },
+  { word: "絶対", meaning: "Mutlak, pasti", reading: "ぜったい" },
+  { word: "きっと", meaning: "Pasti, kemungkinan besar", reading: "きっと" },
+  { word: "たぶん", meaning: "Mungkin", reading: "たぶん" },
+  { word: "おそらく", meaning: "Barangkali, kemungkinan besar", reading: "おそらく" },
+  { word: "例えば", meaning: "Misalnya", reading: "たとえば" },
+  { word: "実は", meaning: "Sebenarnya", reading: "じつは" },
+  { word: "実際", meaning: "Kenyataannya, secara nyata", reading: "じっさい" },
+  { word: "特別に", meaning: "Secara khusus", reading: "とくべつに" },
+  { word: "普段", meaning: "Biasanya, sehari-hari", reading: "ふだん" },
+  { word: "しばらく", meaning: "Sebentar, untuk sementara", reading: "しばらく" },
+  { word: "まもなく", meaning: "Sebentar lagi", reading: "まもなく" },
+  { word: "とうとう", meaning: "Akhirnya", reading: "とうとう" },
+  { word: "ついに", meaning: "Akhirnya, pada akhirnya", reading: "ついに" },
+  { word: "すでに", meaning: "Sudah", reading: "すでに" },
+  { word: "以前", meaning: "Sebelumnya", reading: "いぜん" },
+  { word: "以後", meaning: "Sesudah itu", reading: "いご" },
+  { word: "以来", meaning: "Sejak", reading: "いらい" },
+  { word: "途中で", meaning: "Di tengah jalan atau proses", reading: "とちゅうで" },
+  { word: "最初", meaning: "Awal, pertama", reading: "さいしょ" },
+  { word: "最後", meaning: "Akhir, terakhir", reading: "さいご" },
+  { word: "最近", meaning: "Akhir-akhir ini", reading: "さいきん" },
+  { word: "未来", meaning: "Masa depan", reading: "みらい" },
+  { word: "将来", meaning: "Masa depan, kelak", reading: "しょうらい" },
+  { word: "昔", meaning: "Zaman dahulu", reading: "むかし" },
+  { word: "現代", meaning: "Zaman modern", reading: "げんだい" },
+  { word: "当時", meaning: "Pada waktu itu", reading: "とうじ" },
+  { word: "期間", meaning: "Jangka waktu, periode", reading: "きかん" },
+  { word: "期限", meaning: "Batas waktu, tenggat", reading: "きげん" },
+  { word: "締め切り", meaning: "Batas akhir pengumpulan", reading: "しめきり" },
+
+  { word: "申し込む", meaning: "Mendaftar, mengajukan", reading: "もうしこむ" },
+  { word: "申し込み", meaning: "Pendaftaran, permohonan", reading: "もうしこみ" },
+  { word: "申し訳ない", meaning: "Merasa bersalah, mohon maaf", reading: "もうしわけない" },
+  { word: "お願い", meaning: "Permintaan, permohonan", reading: "おねがい" },
+  { word: "頼む", meaning: "Meminta bantuan, memesan", reading: "たのむ" },
+  { word: "頼り", meaning: "Andalan, bantuan", reading: "たより" },
+  { word: "断る", meaning: "Menolak", reading: "ことわる" },
+  { word: "受け付ける", meaning: "Menerima pendaftaran atau permohonan", reading: "うけつける" },
+  { word: "受け付け", meaning: "Resepsionis, loket penerimaan", reading: "うけつけ" },
+  { word: "払う", meaning: "Membayar", reading: "はらう" },
+  { word: "支払う", meaning: "Membayar", reading: "しはらう" },
+  { word: "受ける", meaning: "Menerima, mengikuti", reading: "うける" },
+  { word: "合格", meaning: "Lulus ujian", reading: "ごうかく" },
+  { word: "不合格", meaning: "Tidak lulus", reading: "ふごうかく" },
+  { word: "試験", meaning: "Ujian", reading: "しけん" },
+  { word: "成績", meaning: "Nilai, hasil belajar", reading: "せいせき" },
+  { word: "点数", meaning: "Skor, jumlah nilai", reading: "てんすう" },
+  { word: "正解", meaning: "Jawaban benar", reading: "せいかい" },
+  { word: "不正解", meaning: "Jawaban salah", reading: "ふせいかい" },
+  { word: "間違い", meaning: "Kesalahan", reading: "まちがい" },
+  { word: "宿題", meaning: "Pekerjaan rumah", reading: "しゅくだい" },
+  { word: "課題", meaning: "Tugas, masalah yang harus diselesaikan", reading: "かだい" },
+  { word: "講義", meaning: "Kuliah, ceramah", reading: "こうぎ" },
+  { word: "講演", meaning: "Pidato, ceramah", reading: "こうえん" },
+  { word: "授業", meaning: "Pelajaran, kelas", reading: "じゅぎょう" },
+  { word: "教科書", meaning: "Buku pelajaran", reading: "きょうかしょ" },
+  { word: "辞書", meaning: "Kamus", reading: "じしょ" },
+  { word: "単語", meaning: "Kosakata, kata", reading: "たんご" },
+  { word: "文法", meaning: "Tata bahasa", reading: "ぶんぽう" },
+  { word: "発音", meaning: "Pelafalan", reading: "はつおん" },
+  { word: "会話", meaning: "Percakapan", reading: "かいわ" },
+  { word: "翻訳", meaning: "Terjemahan", reading: "ほんやく" },
+  { word: "通訳", meaning: "Juru bahasa, penerjemahan lisan", reading: "つうやく" },
+  { word: "留学", meaning: "Belajar di luar negeri", reading: "りゅうがく" },
+  { word: "留学生", meaning: "Pelajar asing", reading: "りゅうがくせい" },
+  { word: "入学", meaning: "Masuk sekolah", reading: "にゅうがく" },
+  { word: "卒業", meaning: "Lulus sekolah", reading: "そつぎょう" },
+  { word: "退学", meaning: "Keluar dari sekolah", reading: "たいがく" },
+  { word: "就職", meaning: "Mendapatkan pekerjaan", reading: "しゅうしょく" },
+  { word: "退職", meaning: "Berhenti kerja, pensiun", reading: "たいしょく" },
+  { word: "面接", meaning: "Wawancara", reading: "めんせつ" },
+  { word: "履歴書", meaning: "Daftar riwayat hidup, CV", reading: "りれきしょ" },
+  { word: "採用", meaning: "Penerimaan karyawan", reading: "さいよう" },
+  { word: "勤める", meaning: "Bekerja di suatu tempat", reading: "つとめる" },
+  { word: "勤務", meaning: "Dinas, pekerjaan", reading: "きんむ" },
+  { word: "残業", meaning: "Lembur", reading: "ざんぎょう" },
+  { word: "出張", meaning: "Perjalanan dinas", reading: "しゅっちょう" },
+  { word: "休暇", meaning: "Cuti, liburan", reading: "きゅうか" },
+  { word: "休憩", meaning: "Istirahat", reading: "きゅうけい" },
+  { word: "退勤", meaning: "Selesai bekerja, pulang kerja", reading: "たいきん" },
+  { word: "職場", meaning: "Tempat kerja", reading: "しょくば" },
+  { word: "同僚", meaning: "Rekan kerja", reading: "どうりょう" },
+  { word: "上司", meaning: "Atasan", reading: "じょうし" },
+  { word: "部下", meaning: "Bawahan", reading: "ぶか" },
+  { word: "社員", meaning: "Karyawan perusahaan", reading: "しゃいん" },
+  { word: "会社員", meaning: "Pegawai perusahaan", reading: "かいしゃいん" },
+  { word: "経営", meaning: "Pengelolaan, manajemen", reading: "けいえい" },
+  { word: "管理", meaning: "Pengelolaan, pengawasan", reading: "かんり" },
+  { word: "営業", meaning: "Kegiatan bisnis, penjualan", reading: "えいぎょう" },
+  { word: "会議", meaning: "Rapat", reading: "かいぎ" },
+  { word: "打ち合わせ", meaning: "Diskusi persiapan, koordinasi", reading: "うちあわせ" },
+  { word: "企画", meaning: "Perencanaan, proyek", reading: "きかく" },
+  { word: "計画", meaning: "Rencana", reading: "けいかく" },
+  { word: "目標", meaning: "Target, tujuan", reading: "もくひょう" },
+  { word: "達成", meaning: "Pencapaian", reading: "たっせい" },
+  { word: "成立", meaning: "Terbentuk, disepakati", reading: "せいりつ" },
+  { word: "協力", meaning: "Kerja sama", reading: "きょうりょく" },
+  { word: "協力する", meaning: "Bekerja sama", reading: "きょうりょくする" },
+  { word: "競争", meaning: "Persaingan", reading: "きょうそう" },
+  { word: "競技", meaning: "Pertandingan, cabang olahraga", reading: "きょうぎ" },
+  { word: "勝負", meaning: "Pertarungan untuk menentukan pemenang", reading: "しょうぶ" },
+  { word: "勝利", meaning: "Kemenangan", reading: "しょうり" },
+  { word: "敗北", meaning: "Kekalahan", reading: "はいぼく" },
+  { word: "効果", meaning: "Efek, khasiat", reading: "こうか" },
+  { word: "効率", meaning: "Efisiensi", reading: "こうりつ" },
+  { word: "能力", meaning: "Kemampuan", reading: "のうりょく" },
+  { word: "才能", meaning: "Bakat", reading: "さいのう" },
+  { word: "特徴", meaning: "Ciri khas", reading: "とくちょう" },
+  { word: "長所", meaning: "Kelebihan", reading: "ちょうしょ" },
+  { word: "短所", meaning: "Kekurangan", reading: "たんしょ" },
+  { word: "利点", meaning: "Keuntungan, kelebihan", reading: "りてん" },
+  { word: "欠点", meaning: "Kekurangan, kelemahan", reading: "けってん" },
+  { word: "共通", meaning: "Kesamaan, umum", reading: "きょうつう" },
+  { word: "個人", meaning: "Individu, pribadi", reading: "こじん" },
+  { word: "全体", meaning: "Keseluruhan", reading: "ぜんたい" },
+  { word: "一部", meaning: "Sebagian", reading: "いちぶ" },
+  { word: "多数", meaning: "Jumlah besar, banyak", reading: "たすう" },
+  { word: "少数", meaning: "Jumlah kecil, sedikit", reading: "しょうすう" },
+  { word: "代表", meaning: "Perwakilan", reading: "だいひょう" },
+  { word: "選手", meaning: "Atlet, pemain", reading: "せんしゅ" },
+  { word: "観客", meaning: "Penonton", reading: "かんきゃく" },
+  { word: "応援", meaning: "Dukungan, menyemangati", reading: "おうえん" },
+  { word: "活動", meaning: "Kegiatan, aktivitas", reading: "かつどう" },
+  { word: "経験者", meaning: "Orang yang berpengalaman", reading: "けいけんしゃ" },
+  { word: "初心者", meaning: "Pemula", reading: "しょしんしゃ" },
+  { word: "専門", meaning: "Bidang khusus, spesialisasi", reading: "せんもん" },
+  { word: "専門家", meaning: "Ahli, pakar", reading: "せんもんか" },
+  { word: "資格", meaning: "Kualifikasi, sertifikat", reading: "しかく" },
+  { word: "条件", meaning: "Syarat, kondisi", reading: "じょうけん" },
+  { word: "基準", meaning: "Standar, patokan", reading: "きじゅん" },
+  { word: "握る", meaning: "Menggenggam", reading: "にぎる" },
+  { word: "握手", meaning: "Jabat tangan", reading: "あくしゅ" },
+  { word: "扱う", meaning: "Menangani; memperlakukan", reading: "あつかう" },
+  { word: "当たる", meaning: "Mengenai; tepat", reading: "あたる" },
+  { word: "当たり前", meaning: "Wajar; sudah semestinya", reading: "あたりまえ" },
+  { word: "宛てる", meaning: "Mengalamatkan", reading: "あてる" },
+  { word: "跡", meaning: "Bekas; jejak", reading: "あと" },
+  { word: "穴", meaning: "Lubang", reading: "あな" },
+  { word: "油", meaning: "Minyak", reading: "あぶら" },
+  { word: "余る", meaning: "Tersisa; berlebih", reading: "あまる" },
+  { word: "編む", meaning: "Merajut; menyusun", reading: "あむ" },
+  { word: "粗い", meaning: "Kasar; tidak halus", reading: "あらい" },
+  { word: "嵐", meaning: "Badai", reading: "あらし" },
+  { word: "争う", meaning: "Bertengkar; bersaing", reading: "あらそう" },
+  { word: "改める", meaning: "Memperbaiki; mengubah", reading: "あらためる" },
+  { word: "表す", meaning: "Mengungkapkan; menunjukkan", reading: "あらわす" },
+  { word: "現れる", meaning: "Muncul; tampak", reading: "あらわれる" },
+  { word: "慌てる", meaning: "Panik; terburu-buru", reading: "あわてる" },
+  { word: "哀れ", meaning: "Menyedihkan; kasihan", reading: "あわれ" },
+  { word: "案", meaning: "Usulan; rencana", reading: "あん" },
+  { word: "胃", meaning: "Lambung", reading: "い" },
+  { word: "意外", meaning: "Tidak terduga", reading: "いがい" },
+  { word: "生き物", meaning: "Makhluk hidup", reading: "いきもの" },
+  { word: "勢い", meaning: "Tenaga; momentum", reading: "いきおい" },
+  { word: "維持", meaning: "Pemeliharaan; mempertahankan", reading: "いじ" },
+  { word: "意識", meaning: "Kesadaran", reading: "いしき" },
+  { word: "異常", meaning: "Tidak normal; abnormal", reading: "いじょう" },
+  { word: "泉", meaning: "Mata air", reading: "いずみ" },
+  { word: "以前", meaning: "Sebelumnya", reading: "いぜん" },
+  { word: "板", meaning: "Papan", reading: "いた" },
+  { word: "偉大", meaning: "Agung; besar", reading: "いだい" },
+  { word: "抱く", meaning: "Memeluk; memiliki perasaan", reading: "いだく" },
+  { word: "痛み", meaning: "Rasa sakit", reading: "いたみ" },
+  { word: "至る", meaning: "Sampai; mencapai", reading: "いたる" },
+  { word: "一応", meaning: "Untuk sementara; bagaimanapun", reading: "いちおう" },
+  { word: "一時", meaning: "Suatu saat; sementara", reading: "いちじ" },
+  { word: "一段と", meaning: "Lebih jauh; semakin", reading: "いちだんと" },
+  { word: "一流", meaning: "Kelas satu; terkemuka", reading: "いちりゅう" },
+  { word: "一瞬", meaning: "Sesaat; sekejap", reading: "いっしゅん" },
+  { word: "一生", meaning: "Seumur hidup", reading: "いっしょう" },
+  { word: "一生懸命", meaning: "Dengan sungguh-sungguh", reading: "いっしょうけんめい" },
+  { word: "一層", meaning: "Lebih lagi; semakin", reading: "いっそう" },
+  { word: "一体", meaning: "Sebenarnya; apa gerangan", reading: "いったい" },
+  { word: "一致", meaning: "Kecocokan; kesesuaian", reading: "いっち" },
+  { word: "一定", meaning: "Tetap; tertentu", reading: "いってい" },
+  { word: "移転", meaning: "Pemindahan; pindah lokasi", reading: "いてん" },
+  { word: "井戸", meaning: "Sumur", reading: "いど" },
+  { word: "挑む", meaning: "Menantang; menghadapi", reading: "いどむ" },
+  { word: "稲", meaning: "Tanaman padi", reading: "いね" },
+  { word: "居眠り", meaning: "Tertidur saat duduk", reading: "いねむり" },
+  { word: "命", meaning: "Nyawa; kehidupan", reading: "いのち" },
+  { word: "違反", meaning: "Pelanggaran", reading: "いはん" },
+  { word: "衣服", meaning: "Pakaian", reading: "いふく" },
+  { word: "今にも", meaning: "Sebentar lagi", reading: "いまにも" },
+  { word: "嫌う", meaning: "Tidak menyukai; membenci", reading: "きらう" },
+  { word: "以来", meaning: "Sejak; semenjak", reading: "いらい" },
+  { word: "依頼", meaning: "Permintaan; meminta bantuan", reading: "いらい" },
+  { word: "医療", meaning: "Perawatan medis", reading: "いりょう" },
+  { word: "岩", meaning: "Batu besar; karang", reading: "いわ" },
+  { word: "祝い", meaning: "Perayaan; ucapan selamat", reading: "いわい" },
+  { word: "祝う", meaning: "Merayakan", reading: "いわう" },
+  { word: "印刷", meaning: "Percetakan; mencetak", reading: "いんさつ" },
+  { word: "印象", meaning: "Kesan", reading: "いんしょう" },
+  { word: "引退", meaning: "Pensiun; mengundurkan diri", reading: "いんたい" },
+  { word: "引用", meaning: "Kutipan; mengutip", reading: "いんよう" },
+  { word: "受け入れる", meaning: "Menerima", reading: "うけいれる" },
+  { word: "受け取る", meaning: "Menerima; mengambil", reading: "うけとる" },
+  { word: "受け持つ", meaning: "Bertanggung jawab atas", reading: "うけもつ" },
+  { word: "動かす", meaning: "Menggerakkan", reading: "うごかす" },
+  { word: "失う", meaning: "Kehilangan", reading: "うしなう" },
+  { word: "疑う", meaning: "Meragukan; mencurigai", reading: "うたがう" },
+  { word: "宇宙", meaning: "Alam semesta", reading: "うちゅう" },
+  { word: "討つ", meaning: "Menyerang; menumpas", reading: "うつ" },
+  { word: "移す", meaning: "Memindahkan", reading: "うつす" },
+  { word: "映す", meaning: "Memantulkan; menayangkan", reading: "うつす" },
+  { word: "訴え", meaning: "Keluhan; tuntutan", reading: "うったえ" },
+  { word: "奪う", meaning: "Merampas; merebut", reading: "うばう" },
+  { word: "埋める", meaning: "Mengubur; mengisi", reading: "うめる" },
+  { word: "敬う", meaning: "Menghormati", reading: "うやまう" },
+  { word: "裏切る", meaning: "Mengkhianati", reading: "うらぎる" },
+  { word: "裏返す", meaning: "Membalikkan bagian dalam ke luar", reading: "うらがえす" },
+  { word: "売上", meaning: "Hasil penjualan", reading: "うりあげ" },
+  { word: "売り切れ", meaning: "Habis terjual", reading: "うりきれ" },
+  { word: "売り場", meaning: "Tempat penjualan", reading: "うりば" },
+  { word: "売れる", meaning: "Laku terjual", reading: "うれる" },
+  { word: "噂", meaning: "Rumor; gosip", reading: "うわさ" },
+  { word: "運", meaning: "Keberuntungan", reading: "うん" },
+  { word: "運営", meaning: "Pengelolaan; operasional", reading: "うんえい" },
+  { word: "運河", meaning: "Kanal", reading: "うんが" },
+  { word: "運賃", meaning: "Tarif transportasi", reading: "うんちん" },
+  { word: "運転手", meaning: "Pengemudi", reading: "うんてんしゅ" },
+  { word: "運輸", meaning: "Transportasi; pengangkutan", reading: "うんゆ" },
+  { word: "運用", meaning: "Penggunaan; pengoperasian", reading: "うんよう" },
+  { word: "永遠", meaning: "Keabadian; selamanya", reading: "えいえん" },
+  { word: "永久", meaning: "Permanen; kekal", reading: "えいきゅう" },
+  { word: "影響", meaning: "Pengaruh", reading: "えいきょう" },
+  { word: "営業", meaning: "Bisnis; kegiatan usaha", reading: "えいぎょう" },
+  { word: "衛生", meaning: "Kebersihan; sanitasi", reading: "えいせい" },
+  { word: "栄養", meaning: "Nutrisi; gizi", reading: "えいよう" },
+  { word: "笑顔", meaning: "Wajah tersenyum", reading: "えがお" },
+  { word: "描く", meaning: "Menggambar; melukiskan", reading: "えがく" },
+  { word: "得る", meaning: "Memperoleh", reading: "える" },
+    
+  
+  ];
+  const statusLabels = { learned:"Sudah Hafal", unsure:"Ragu-ragu", unlearned:"Belum Hafal" };
+  const status = {};
+  let current = 0;
+  let showingMeaning = false;
+  let activeFilter = null;
+  let filteredCards = [...cards];
+
+  const $ = id => document.getElementById(id);
+  function renderCard() {
+    const card = filteredCards[current];
+    if (!card) {
+      $("word").textContent = "Tidak ada kartu";
+      $("reading").textContent = "";
+      $("meaning").textContent = "";
+      $("flashcard").classList.remove("flipped");
+      $("progress").textContent = "0 / 0";
+      return;
+    }
+    $("word").textContent = card.word;
+    $("reading").textContent = card.reading;
+    $("meaning").textContent = card.meaning;
+    $("flashcard").classList.toggle("flipped", showingMeaning);
+    $("progress").textContent = `${current + 1} / ${filteredCards.length}`;
+  }
+  function flipCard() { showingMeaning = !showingMeaning; renderCard(); }
+  function goTo(index) {
+    if (!filteredCards.length) return;
+    current = (index + filteredCards.length) % filteredCards.length;
+    if ($("statusFeedback")) $("statusFeedback").textContent = "";
+    showingMeaning = false;
+    renderCard();
+  }
+  function updateSummary() {
+    $("learnedCount").textContent = cards.filter(c => status[c.word] === "learned").length;
+    $("unsureCount").textContent = cards.filter(c => status[c.word] === "unsure").length;
+    $("unlearnedCount").textContent = cards.filter(c => status[c.word] === "unlearned" || !status[c.word]).length;
+  }
+  function setView(view) {
+    const isLearn = view === "learn";
+    $("learnView").classList.toggle("hidden", !isLearn);
+    $("summaryView").classList.toggle("hidden", isLearn);
+    $("learnTab").classList.toggle("active", isLearn);
+    $("summaryTab").classList.toggle("active", !isLearn);
+    if (!isLearn) updateSummary();
+  }
+  function markCard(value) {
+    const card = filteredCards[current];
+    if (!card) return;
+    status[card.word] = value;
+    updateSummary();
+    const feedback = $("statusFeedback");
+    feedback.textContent = `Tersimpan: ${statusLabels[value]} — ${card.word}`;
+    // Pindah ke kartu berikutnya setelah status benar-benar dicatat.
+    if (current < filteredCards.length - 1) {
+      goTo(current + 1);
+    } else {
+      showingMeaning = false;
+      renderCard();
+      feedback.textContent = `Tersimpan: ${statusLabels[value]} — ${card.word}. Semua kartu dalam daftar ini sudah dinilai.`;
+    }
+  }
+  document.querySelectorAll("button[data-status]").forEach(button => {
+    button.type = "button";
+    button.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      markCard(button.dataset.status);
+    });
+  });
+  $("flashcard").addEventListener("click", () => {
+    if (didSwipe) { didSwipe = false; return; }
+    flipCard();
+  });
+  $("flashcard").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flipCard(); } });
+
+  // Geser ke kiri = kartu sebelumnya, geser ke kanan = kartu berikutnya.
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let didSwipe = false;
+  const flashcardEl = $("flashcard");
+  flashcardEl.addEventListener("touchstart", e => {
+    if (!e.changedTouches.length) return;
+    touchStartX = e.changedTouches[0].clientX;
+    touchStartY = e.changedTouches[0].clientY;
+    didSwipe = false;
+  }, { passive: true });
+  flashcardEl.addEventListener("touchend", e => {
+    if (!e.changedTouches.length) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX;
+    const deltaY = e.changedTouches[0].clientY - touchStartY;
+    if (Math.abs(deltaX) < 45 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return;
+    didSwipe = true;
+    if (deltaX > 0) goTo(current + 1);
+    else goTo(current - 1);
+  }, { passive: true });
+  $("prevBtn").addEventListener("click", () => goTo(current - 1));
+  $("nextBtn").addEventListener("click", () => goTo(current + 1));
+
+  // Acak urutan kartu yang sedang ditampilkan.
+  function shuffleCards() {
+    for (let i = filteredCards.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [filteredCards[i], filteredCards[j]] = [filteredCards[j], filteredCards[i]];
+    }
+    current = 0; showingMeaning = false; renderCard();
+  }
+  $("topShuffleBtn").addEventListener("click", shuffleCards);
+
+  // Reset status hafalan untuk memulai dari awal.
+  function resetAll() {
+    // Mulai ulang langsung tanpa dialog browser yang kadang tidak tampil dengan baik di HP.
+    Object.keys(status).forEach(key => delete status[key]);
+    filteredCards = [...cards];
+    activeFilter = null;
+    current = 0;
+    showingMeaning = false;
+    goTo(0);
+    updateSummary();
+  }
+  $("topResetBtn").addEventListener("click", resetAll);
+  $("learnTab").addEventListener("click", () => { activeFilter = null; filteredCards = [...cards]; goTo(0); setView("learn"); });
+  $("summaryTab").addEventListener("click", () => { updateSummary(); setView("summary"); });
+  function startReview(filter) {
+    activeFilter = filter;
+    filteredCards = cards.filter(c => filter === "unlearned" ? (status[c.word] === "unlearned" || !status[c.word]) : status[c.word] === filter);
+    current = 0; showingMeaning = false; renderCard(); setView("learn");
+  }
+  document.querySelectorAll("[data-filter]").forEach(item => {
+    const activate = () => startReview(item.dataset.filter);
+    item.addEventListener("click", activate);
+    item.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); } });
+  });
+  updateSummary();
+  renderCard();
+</script>
+</body>
+</html>
